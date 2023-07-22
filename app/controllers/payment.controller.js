@@ -139,7 +139,7 @@ exports.trxHash = async (req, res) => {
     const now = new Date();
     const formattedDatetime = moment(now).format('YYYY-MM-DD HH:mm:ss');
     
-    sql.query(`INSERT INTO deposits ( user_id, amount, trx, status, btc_wallet, created_at, updated_at ) VALUES (${req.user.sub}, ${amount}, '${hash}', 2, '${address}', '${formattedDatetime}', '${formattedDatetime}')`, (err, result) => {
+    sql.query(`INSERT INTO deposits ( user_id, amount, method_currency, trx, status, btc_wallet, created_at, updated_at ) VALUES (${req.user.sub}, ${amount}, 'KFC', '${hash}', 2, '${address}', '${formattedDatetime}', '${formattedDatetime}')`, (err, result) => {
         if (err) {
             console.log(err);
             res.send({status: false, hash});
@@ -178,14 +178,36 @@ exports.trxList = async (req, res) => {
                         conn.query(`SELECT balance FROM users WHERE id=${req.user.sub}`, (error, balance) => {
                             conn.release();
 
-                            if (balance.length) {
-                                res.status(200).json({
-                                    status : true,
-                                    deposits,
-                                    withdrawals,
-                                    balance: balance[0].balance
+                            sql.getConnection((error, conn) => {
+                                if (error) {
+                                    throw error;
+                                }
+                                conn.query(`SELECT SUM(amount) AS total_deposits FROM deposits WHERE user_id = ${req.user.sub}`, (error, total_deposits) => {
+                                    conn.release();
+                
+                                    sql.getConnection((error, conn) => {
+                                        if (error) {
+                                            throw error;
+                                        }
+                                        conn.query(`SELECT SUM(amount) AS total_withdrawals FROM withdrawals WHERE user_id = ${req.user.sub}`, (error, total_withdrawals) => {
+                                            conn.release();
+            
+
+                                            if (balance.length) {
+                                                res.status(200).json({
+                                                    status : true,
+                                                    deposits,
+                                                    withdrawals,
+                                                    balance: balance[0].balance,
+                                                    total_deposits:total_deposits[0].total_deposits,
+                                                    total_withdrawals: total_withdrawals[0].total_withdrawals
+                                                });
+                                            }
+                                        });
+
+                                    });
                                 });
-                            }
+                            });
                         });                
                     });
                 });
@@ -234,6 +256,7 @@ exports.withdraw = async (req, res) => {
 
                 const signedTransaction = await web3.eth.accounts.signTransaction(transactionObject, senderPrivateKey);
                 console.log(signedTransaction);
+                const gas = web3.utils.fromWei(gasPrice, 'gwei')
 
                 sql.getConnection((error, conn) => {
                     if (error) {
@@ -242,7 +265,7 @@ exports.withdraw = async (req, res) => {
                     const now = new Date();
                     const formattedDatetime = moment(now).format('YYYY-MM-DD HH:mm:ss');
 
-                    conn.query(`INSERT INTO withdrawals ( user_id, amount, trx, status, account_wallet, created_at, updated_at ) VALUES (${user_id}, ${amount}, '${signedTransaction.transactionHash}', 2, '${wallet}', '${formattedDatetime}', '${formattedDatetime}')`, (error, result) => {
+                    conn.query(`INSERT INTO withdrawals ( user_id, method_id, ref_by, amount, currency, trx, gasfee, status, account_wallet, created_at, updated_at ) VALUES (${user_id}, 1, 10, ${amount}, 'BNB', '${signedTransaction.transactionHash}', ${gas} , 2, '${wallet}', '${formattedDatetime}', '${formattedDatetime}')`, (error, result) => {
                         if (error) {
                             console.log(error)
                         }
@@ -259,6 +282,11 @@ exports.withdraw = async (req, res) => {
                 } catch (error) {
                     console.error(error);
                 }
+            } else {
+                res.status(200).json({
+                    status : false,
+                    message: 'Your balance is below requested amount.'
+                });
             }
         });
     });

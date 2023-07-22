@@ -2,8 +2,19 @@ var express = require('express');
 var jwt = require('jsonwebtoken');
 var path = require('path')
 var bodyParser = require('body-parser');
+var cors = require('cors');
 var empty  = require('is-empty');
 var {getTransactionHashList} = require('./app/cron/transactionStatus');
+const sql = require("./app/models/db");
+
+sql.getConnection((err, connection) => {
+    if (err) {
+      console.error('Error connecting to the database:', err);
+      return;
+    }
+    console.log('Connected Database')
+    connection.release();
+});
 
 var app = express();
 
@@ -14,15 +25,9 @@ var port = process.env.PORT || 3001;
 
 app.use(express.static(path.join(__dirname, 'dist')))
 // Add headers before the routes are defined
-app.use(function (req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type,Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', true);
-
-    // Pass to next layer of middleware
-    next();
-});
+app.use(cors({
+    origin: '*'
+}));
 
 setInterval(getTransactionHashList, 5000);
 

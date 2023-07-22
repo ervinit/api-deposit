@@ -21,7 +21,6 @@ const authenticateJWT = (req, res, next) => {
 };
 
 router.get('/dashboard', authenticateJWT, paymentController.dashboard);
-// router.get('/dashboard', paymentController.dashboard);
 router.get('/trxList', authenticateJWT, paymentController.trxList);
 router.post('/trxHash', authenticateJWT, paymentController.trxHash);
 router.post('/withdraw', authenticateJWT, paymentController.withdraw);
